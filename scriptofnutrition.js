@@ -1,8 +1,10 @@
-document.getElementById("nutritionForm").addEventListener("submit", async function (e) {
+document.getElementById("nutrition-form").addEventListener("submit", async function (e) {
   e.preventDefault();
+
   const form = e.target;
   const formData = new FormData(form);
   const data = Object.fromEntries(formData.entries());
+  console.log("Form Data Submitted:", data);
 
   const prompt = `
 Design a highly personalized nutrition and meal plan for a person based on the following details:
@@ -25,51 +27,70 @@ The plan should include:
 - Total daily calorie goal based on fitness objective
 `;
 
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": "Bearer gsk_your_groq_api_key",
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: "llama3-70b-8192",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.7
-    })
-  });
+  const output = document.getElementById("response-box");
+  output.innerHTML = "⏳ Generating your personalized plan…";
 
-  const result = await response.json();
-  const reply = result.choices[0].message.content;
-  displayMealPlan(reply);
+  try {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer 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",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "llama3-70b-8192",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.7
+      })
+    });
+
+    const json = await res.json();
+    console.log("Response:", json);
+
+    if (json.choices && json.choices.length > 0) {
+      displayMealPlan(json.choices[0].message.content);
+    } else {
+      output.innerHTML = "⚠ No response generated.";
+    }
+  } catch (error) {
+    console.error("Error:", error);
+    output.innerHTML = "⚠ Something went wrong. Please try again.";
+  }
 });
 
 function displayMealPlan(text) {
-  const output = document.getElementById("output");
+  const output = document.getElementById("response-box");
   output.innerHTML = "";
 
-  const sections = text.split(/\n\s*\n/).filter(Boolean);
-  const emojis = {
-    morning: "🍵",
-    breakfast: "🍳",
-    lunch: "🍛",
-    snack: "🍎",
-    dinner: "🌙"
-  };
+  // Split text into sections using double newlines
+  const sections = text.split(/\n\n+/);
+
+  function getEmoji(title) {
+    const lower = title.toLowerCase();
+    if (lower.includes("morning")) return "🍵";
+    if (lower.includes("breakfast")) return "🍳";
+    if (lower.includes("lunch")) return "🍛";
+    if (lower.includes("snack")) return "🍎";
+    if (lower.includes("dinner")) return "🌙";
+    if (lower.includes("water")) return "🚰";
+    if (lower.includes("tip")) return "💡";
+    if (lower.includes("fitness")) return "🏋️";
+    if (lower.includes("activity")) return "🏃";
+    if (lower.includes("profile") || lower.includes("user")) return "📋";
+    return "";
+  }
 
   sections.forEach(section => {
-    const titleMatch = section.match(/^(.*?):/i);
-    let title = "Meal";
-    if (titleMatch) {
-      const keyword = titleMatch[1].toLowerCase();
-      title = emojis[keyword] ? `${emojis[keyword]} ${titleMatch[1]}` : titleMatch[1];
-    }
+    const lines = section.trim().split("\n");
+    const titleRaw = lines[0] || "Section";
+    const body = lines.slice(1).join("\n");
+
+    const emoji = getEmoji(titleRaw);
+    const title = emoji ? `${emoji} ${titleRaw}` : titleRaw;
 
     const card = document.createElement("div");
     card.className = "meal-card";
-    card.innerHTML = `
-      <h3>${title}</h3>
-      <p>${section.replace(titleMatch[0], "").trim()}</p>
-    `;
+    card.innerHTML = `<h3>${title}</h3><p>${body}</p>`;
     output.appendChild(card);
   });
 }
